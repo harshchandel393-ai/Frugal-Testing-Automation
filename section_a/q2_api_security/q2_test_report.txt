@@ -1,0 +1,15 @@
+FRUGAL TESTING - Q2 CRYPTOGRAPHIC REPLAY REPORT
+=======================================================
+[PASS] Local API health check
+[PASS] POST transaction creation and dynamic ID extraction
+[PASS] Challenge verification and HMAC-SHA512 generation
+[PASS] First authenticated PUT request
+[PASS] Identical replay rejected within 150 ms
+[PASS] Second authenticated chained update
+[PASS] SHA-512 hash-chain integrity verification
+
+Total tests: 7
+Passed: 7
+Failed: 0
+
+ALL Q2 TESTS PASSED

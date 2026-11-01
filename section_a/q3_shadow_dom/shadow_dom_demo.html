@@ -1,0 +1,484 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Q3 Shadow DOM Security Demo</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            background: #101827;
+            color: #e5e7eb;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            max-width: 800px;
+            margin: auto;
+            padding: 30px;
+            background: #172235;
+            border: 1px solid #334155;
+            border-radius: 16px;
+        }
+
+        h1 {
+            color: #60a5fa;
+            margin-top: 0;
+        }
+
+        .description {
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .fingerprint {
+            color: #fbbf24;
+            font-size: 12px;
+            line-height: 1.8;
+            overflow-wrap: anywhere;
+            margin: 15px 0;
+        }
+
+        outer-shell,
+        middle-shell,
+        sealed-panel {
+            display: block;
+            margin: 16px 0;
+            padding: 16px;
+            border: 1px solid #475569;
+            border-radius: 10px;
+        }
+
+        output[role="status"] {
+            display: block;
+            margin-top: 22px;
+            padding: 16px;
+            border-radius: 8px;
+            background: #26374d;
+            color: #86efac;
+            line-height: 1.5;
+        }
+
+        output[role="status"][data-state="success"] {
+            background: #123b2c;
+            color: #86efac;
+        }
+    </style>
+</head>
+
+<body>
+
+<main aria-label="Q3 Shadow DOM demonstration">
+
+    <h1>Shadow DOM Pathfinding Demo</h1>
+
+    <p class="description">
+        This application demonstrates deeply nested
+        open and closed Shadow DOM boundaries.
+    </p>
+
+    <p
+        class="fingerprint"
+        aria-label="Dynamic component fingerprints"
+    >
+        Generating dynamic host classes...
+    </p>
+
+    <!-- OUTER CUSTOM ELEMENT -->
+    <outer-shell></outer-shell>
+
+    <!-- ACCESSIBLE LIVE STATUS -->
+    <output
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label="Authorization status"
+        data-state="pending"
+    >
+        Waiting for authorization...
+    </output>
+
+</main>
+
+<script>
+
+    // =================================================
+    // UTILITY: Generate different classes on every load
+    // =================================================
+
+    function generateDynamicClass() {
+
+        return (
+            "obfuscated-" +
+            crypto.randomUUID()
+                .replaceAll("-", "")
+                .slice(0, 12)
+        );
+    }
+
+
+    // =================================================
+    // COMPONENT 1: OUTER OPEN SHADOW DOM
+    // =================================================
+
+    class OuterShell extends HTMLElement {
+
+        connectedCallback() {
+
+            // Random class on every page load.
+            this.className = generateDynamicClass();
+
+            const shadow = this.attachShadow({
+                mode: "open"
+            });
+
+            shadow.innerHTML = `
+                <style>
+
+                    section {
+                        padding: 16px;
+                        border: 1px dashed #60a5fa;
+                        border-radius: 10px;
+                    }
+
+                    h2 {
+                        color: #93c5fd;
+                        font-size: 18px;
+                    }
+
+                    p {
+                        color: #cbd5e1;
+                        font-size: 13px;
+                    }
+
+                </style>
+
+                <section
+                    aria-label="Outer component boundary"
+                >
+
+                    <h2>Outer Open Shadow Root</h2>
+
+                    <p>
+                        First accessible shadow boundary.
+                    </p>
+
+                    <middle-shell></middle-shell>
+
+                </section>
+            `;
+        }
+    }
+
+
+    // =================================================
+    // COMPONENT 2: MIDDLE OPEN SHADOW DOM
+    // =================================================
+
+    class MiddleShell extends HTMLElement {
+
+        connectedCallback() {
+
+            this.className = generateDynamicClass();
+
+            const shadow = this.attachShadow({
+                mode: "open"
+            });
+
+            shadow.innerHTML = `
+                <style>
+
+                    section {
+                        padding: 16px;
+                        border: 1px dashed #a78bfa;
+                        border-radius: 10px;
+                    }
+
+                    h3 {
+                        color: #c4b5fd;
+                        font-size: 16px;
+                    }
+
+                    p {
+                        color: #cbd5e1;
+                        font-size: 13px;
+                    }
+
+                </style>
+
+                <section
+                    aria-label="Middle component boundary"
+                >
+
+                    <h3>Middle Open Shadow Root</h3>
+
+                    <p>
+                        Second accessible shadow boundary.
+                    </p>
+
+                    <sealed-panel></sealed-panel>
+
+                </section>
+            `;
+        }
+    }
+
+
+    // =================================================
+    // COMPONENT 3: INNER CLOSED SHADOW DOM
+    // =================================================
+
+    class SealedPanel extends HTMLElement {
+
+        connectedCallback() {
+
+            this.className = generateDynamicClass();
+
+            // IMPORTANT:
+            // Closed Shadow Root cannot be accessed
+            // through the normal host.shadowRoot property.
+
+            const shadow = this.attachShadow({
+                mode: "closed"
+            });
+
+            const section = document.createElement("section");
+
+            section.setAttribute(
+                "aria-label",
+                "Sealed authorization component"
+            );
+
+            section.style.cssText = `
+                padding: 16px;
+                border: 1px dashed #f59e0b;
+                border-radius: 10px;
+                background: #202d40;
+            `;
+
+            const heading = document.createElement("h3");
+
+            heading.textContent = "Closed Shadow Root";
+
+            heading.style.color = "#fbbf24";
+
+            const description = document.createElement("p");
+
+            description.textContent =
+                "Protected transaction authorization control.";
+
+            description.style.color = "#cbd5e1";
+
+            const button = document.createElement("button");
+
+            button.type = "button";
+
+            // Accessible semantic information.
+            // Target discovery will be performed
+            // through the browser Accessibility Tree.
+
+            button.setAttribute(
+                "aria-label",
+                "Transaction authorization control"
+            );
+
+            button.setAttribute(
+                "aria-describedby",
+                "authorization-description"
+            );
+
+            button.textContent =
+                "Authorize Secure Transaction";
+
+            button.style.cssText = `
+                padding: 13px 24px;
+                border: none;
+                border-radius: 8px;
+                background: #2563eb;
+                color: white;
+                font-size: 15px;
+                cursor: pointer;
+            `;
+
+            button.addEventListener("focus", () => {
+
+                button.style.outline =
+                    "3px solid #facc15";
+
+                button.style.outlineOffset = "3px";
+            });
+
+            button.addEventListener("blur", () => {
+
+                button.style.outline = "none";
+            });
+
+            button.addEventListener("click", () => {
+
+                // Update the page's accessible live region.
+                const status = document.querySelector(
+                    'output[role="status"]'
+                );
+
+                status.setAttribute(
+                    "aria-label",
+                    "Authorization completed"
+                );
+
+                status.setAttribute(
+                    "data-state",
+                    "success"
+                );
+
+                status.textContent =
+                    "Authorization completed successfully.";
+
+                button.setAttribute(
+                    "aria-label",
+                    "Transaction authorization completed"
+                );
+
+                button.disabled = true;
+            });
+
+            const helper = document.createElement("span");
+
+            helper.setAttribute(
+                "id",
+                "authorization-description"
+            );
+
+            helper.textContent =
+                "Activates the secure transaction authorization operation.";
+
+            helper.style.display = "block";
+            helper.style.marginTop = "10px";
+            helper.style.color = "#cbd5e1";
+            helper.style.fontSize = "12px";
+
+            section.appendChild(heading);
+            section.appendChild(description);
+            section.appendChild(button);
+            section.appendChild(helper);
+
+            shadow.appendChild(section);
+        }
+    }
+
+
+    // =================================================
+    // REGISTER CUSTOM ELEMENTS
+    // =================================================
+
+    customElements.define(
+        "outer-shell",
+        OuterShell
+    );
+
+    customElements.define(
+        "middle-shell",
+        MiddleShell
+    );
+
+    customElements.define(
+        "sealed-panel",
+        SealedPanel
+    );
+
+
+    // =================================================
+    // RECURSIVE OPEN SHADOW ROOT TRAVERSAL
+    // =================================================
+
+    function collectDynamicHosts(root) {
+
+        const results = [];
+
+        const walker = document.createTreeWalker(
+            root,
+            NodeFilter.SHOW_ELEMENT
+        );
+
+        let element;
+
+        while ((element = walker.nextNode())) {
+
+            const componentNames = [
+                "OUTER-SHELL",
+                "MIDDLE-SHELL",
+                "SEALED-PANEL"
+            ];
+
+            if (componentNames.includes(element.tagName)) {
+
+                results.push(
+                    `${element.tagName}: ${element.className}`
+                );
+            }
+
+            // Traverse only publicly accessible
+            // OPEN Shadow Roots.
+
+            if (element.shadowRoot) {
+
+                results.push(
+                    ...collectDynamicHosts(
+                        element.shadowRoot
+                    )
+                );
+            }
+
+        }
+
+        return results;
+    }
+
+
+    // =================================================
+    // DISPLAY DYNAMIC CLASS FINGERPRINTS
+    // =================================================
+
+    window.addEventListener(
+        "DOMContentLoaded",
+        () => {
+
+            const classes = collectDynamicHosts(
+                document
+            );
+
+            const fingerprint = document.querySelector(
+                ".fingerprint"
+            );
+
+            fingerprint.textContent =
+                "Dynamic host classes: " +
+                classes.join(" | ");
+
+            console.log(
+                "[Q3] Dynamic host fingerprints:",
+                classes
+            );
+
+            console.log(
+                "[Q3] Open Shadow DOM traversal completed."
+            );
+
+            console.log(
+                "[Q3] Closed Shadow DOM host identified."
+            );
+        }
+    );
+
+</script>
+
+</body>
+</html>

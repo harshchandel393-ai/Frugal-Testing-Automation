@@ -1,0 +1,6 @@
+playwright
+pytest
+requests
+fastapi
+uvicorn
+websockets

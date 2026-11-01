@@ -1,0 +1,700 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frugal Testing - Canvas Automation</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #101827;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 950px;
+            background: #1c293b;
+            border: 1px solid #34445c;
+            border-radius: 14px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 25px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #aab8ca;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .info-card {
+            background: #26364c;
+            border-radius: 8px;
+            padding: 13px;
+        }
+
+        .info-card span {
+            display: block;
+            font-size: 12px;
+            color: #aab8ca;
+            margin-bottom: 7px;
+        }
+
+        .info-card strong {
+            font-size: 16px;
+        }
+
+        .canvas-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            background: #0c1421;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            margin: auto;
+            background: #111c2c;
+            border: 1px solid #3b4b61;
+            border-radius: 5px;
+            touch-action: none;
+        }
+
+        .instructions {
+            margin-top: 18px;
+            padding: 14px;
+            background: #26364c;
+            border-radius: 8px;
+            color: #d4deeb;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .instructions strong {
+            color: white;
+        }
+
+        .footer {
+            margin-top: 15px;
+            color: #8192a8;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Canvas Automation Testbed</h1>
+
+        <p class="subtitle">
+            Frugal Testing - AI-Native Software Engineer Assignment
+        </p>
+
+        <div class="dashboard">
+
+            <div class="info-card">
+                <span>WebSocket Connection</span>
+                <strong id="connectionStatus">Connecting...</strong>
+            </div>
+
+            <div class="info-card">
+                <span>Balance</span>
+                <strong id="balance">100</strong>
+            </div>
+
+            <div class="info-card">
+                <span>Sequence Number</span>
+                <strong id="sequence">0</strong>
+            </div>
+
+        </div>
+
+        <div class="canvas-wrapper">
+
+            <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+        </div>
+
+        <div class="instructions">
+
+            <strong>Automation Instructions</strong>
+
+            <p>1. Detect the green target using Canvas pixel scanning.</p>
+            <p>2. Track its changing position using WebSocket updates.</p>
+            <p>3. Hover over the target.</p>
+            <p>4. Drag the target exactly 15 pixels horizontally.</p>
+            <p>5. Click to complete the chained interaction.</p>
+
+            <p>
+                <strong>Current Status:</strong>
+                <span id="status">Waiting for WebSocket...</span>
+            </p>
+
+        </div>
+
+        <div class="footer">
+            Python + Playwright + FastAPI + WebSocket
+        </div>
+
+    </div>
+
+    <script>
+
+        // ==========================================
+        // 1. DOM ELEMENTS
+        // ==========================================
+
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const connectionStatus =
+            document.getElementById("connectionStatus");
+
+        const balanceElement =
+            document.getElementById("balance");
+
+        const sequenceElement =
+            document.getElementById("sequence");
+
+        const statusElement =
+            document.getElementById("status");
+
+
+        // ==========================================
+        // 2. APPLICATION STATE
+        // ==========================================
+
+        const state = {
+
+            active: true,
+            balance: 100,
+            sequence: 0,
+
+            offsetX: 0,
+            offsetY: 0,
+
+            x: 350,
+            y: 190,
+
+            targetWidth: 100,
+            targetHeight: 60
+
+        };
+
+        let dragging = false;
+        let dragStart = null;
+        let dragCompleted = false;
+        let clickDetected = false;
+        let animationFrame = null;
+
+
+        // ==========================================
+        // 3. CANVAS DRAWING
+        // ==========================================
+
+        function drawGrid() {
+
+            ctx.strokeStyle = "#26364c";
+            ctx.lineWidth = 1;
+
+            for (let x = 0; x <= canvas.width; x += 40) {
+
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+
+            }
+
+            for (let y = 0; y <= canvas.height; y += 40) {
+
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+
+            }
+
+        }
+
+
+        function drawTarget() {
+
+            const targetX = state.x + state.offsetX;
+            const targetY = state.y + state.offsetY;
+
+            ctx.fillStyle = "#00ff55";
+
+            ctx.fillRect(
+                targetX,
+                targetY,
+                state.targetWidth,
+                state.targetHeight
+            );
+
+            ctx.strokeStyle = "#b6ffca";
+            ctx.lineWidth = 2;
+
+            ctx.strokeRect(
+                targetX,
+                targetY,
+                state.targetWidth,
+                state.targetHeight
+            );
+
+            ctx.fillStyle = "#071b0d";
+            ctx.font = "bold 15px Arial";
+
+            ctx.fillText(
+                "TARGET",
+                targetX + 24,
+                targetY + 35
+            );
+
+        }
+
+
+        function draw() {
+
+            ctx.clearRect(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+            drawGrid();
+
+            if (state.active) {
+                drawTarget();
+            }
+
+            animationFrame = requestAnimationFrame(draw);
+
+        }
+
+
+        // ==========================================
+        // 4. WEBSOCKET CONNECTION
+        // ==========================================
+
+        let socket = null;
+
+        function connectWebSocket() {
+
+            socket = new WebSocket(
+                "ws://127.0.0.1:8000/ws"
+            );
+
+            socket.onopen = function () {
+
+                connectionStatus.textContent = "Connected";
+                connectionStatus.style.color = "#00ff55";
+
+                statusElement.textContent =
+                    "WebSocket connected";
+
+                console.log("[WEBSOCKET] Connected");
+
+            };
+
+
+            socket.onmessage = function (event) {
+
+                try {
+
+                    const message = JSON.parse(event.data);
+
+                    if (message.type === "state") {
+
+                        state.active =
+                            message.status === "active";
+
+                        state.balance = message.balance;
+
+                        state.offsetX = message.offset_x;
+
+                        state.offsetY = message.offset_y;
+
+                        state.sequence = message.sequence;
+
+                        balanceElement.textContent =
+                            state.balance;
+
+                        sequenceElement.textContent =
+                            state.sequence;
+
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "[WEBSOCKET] Invalid message",
+                        error
+                    );
+
+                }
+
+            };
+
+
+            socket.onerror = function (error) {
+
+                console.error(
+                    "[WEBSOCKET] Error",
+                    error
+                );
+
+            };
+
+
+            socket.onclose = function () {
+
+                connectionStatus.textContent = "Disconnected";
+                connectionStatus.style.color = "#ff5555";
+
+                statusElement.textContent =
+                    "WebSocket disconnected";
+
+                console.log("[WEBSOCKET] Disconnected");
+
+            };
+
+        }
+
+
+        // ==========================================
+        // 5. COORDINATE CALCULATION
+        // ==========================================
+
+        function getCanvasCoordinates(event) {
+
+            const rect = canvas.getBoundingClientRect();
+
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return {
+
+                x: (event.clientX - rect.left) * scaleX,
+
+                y: (event.clientY - rect.top) * scaleY
+
+            };
+
+        }
+
+
+        function isInsideTarget(x, y) {
+
+            const targetX = state.x + state.offsetX;
+            const targetY = state.y + state.offsetY;
+
+            return (
+
+                x >= targetX &&
+                x <= targetX + state.targetWidth &&
+                y >= targetY &&
+                y <= targetY + state.targetHeight
+
+            );
+
+        }
+
+
+        // ==========================================
+        // 6. HOVER DETECTION
+        // ==========================================
+
+        canvas.addEventListener(
+            "pointermove",
+            function (event) {
+
+                const point = getCanvasCoordinates(event);
+
+                if (isInsideTarget(point.x, point.y)) {
+
+                    canvas.style.cursor = "pointer";
+
+                    if (!dragging && !dragCompleted) {
+
+                        statusElement.textContent =
+                            "Target detected - Hover successful";
+
+                    }
+
+                } else {
+
+                    canvas.style.cursor = "crosshair";
+
+                }
+
+            }
+        );
+
+
+        // ==========================================
+        // 7. DRAG START
+        // ==========================================
+
+        canvas.addEventListener(
+            "pointerdown",
+            function (event) {
+
+                // IMPORTANT:
+                // Do not reset dragCompleted during
+                // the confirmation click after dragging.
+
+                if (dragCompleted) {
+                    return;
+                }
+
+                const point = getCanvasCoordinates(event);
+
+                if (
+                    state.active &&
+                    isInsideTarget(point.x, point.y)
+                ) {
+
+                    dragging = true;
+
+                    clickDetected = false;
+
+                    dragStart = {
+                        x: point.x,
+                        y: point.y
+                    };
+
+                    canvas.setPointerCapture(event.pointerId);
+
+                    statusElement.textContent =
+                        "Drag started";
+
+                }
+
+            }
+        );
+
+
+        // ==========================================
+        // 8. DRAG END AND VALIDATION
+        // ==========================================
+
+        canvas.addEventListener(
+            "pointerup",
+            function (event) {
+
+                if (!dragging || !dragStart) {
+                    return;
+                }
+
+                const point = getCanvasCoordinates(event);
+
+                const dx = point.x - dragStart.x;
+                const dy = point.y - dragStart.y;
+
+                if (
+                    Math.abs(dx - 15) <= 2 &&
+                    Math.abs(dy) <= 2
+                ) {
+
+                    dragCompleted = true;
+
+                    statusElement.textContent =
+                        "Drag completed - waiting for click";
+
+                    console.log(
+                        "[DRAG] Successful displacement:",
+                        dx
+                    );
+
+                } else {
+
+                    dragCompleted = false;
+
+                    statusElement.textContent =
+                        "Drag failed - Expected 15px horizontal movement";
+
+                    console.log(
+                        "[DRAG] Invalid displacement:",
+                        dx,
+                        dy
+                    );
+
+                }
+
+                dragging = false;
+                dragStart = null;
+
+            }
+        );
+
+
+        // ==========================================
+        // 9. CLICK VALIDATION
+        // ==========================================
+
+        canvas.addEventListener(
+            "click",
+            function (event) {
+
+                if (!dragCompleted) {
+                    return;
+                }
+
+                const point = getCanvasCoordinates(event);
+
+                if (
+                    point.x >= 0 &&
+                    point.y >= 0 &&
+                    point.x <= canvas.width &&
+                    point.y <= canvas.height
+                ) {
+
+                    clickDetected = true;
+
+                    dragCompleted = false;
+
+                    statusElement.textContent =
+                        "SUCCESS: Hover, Drag and Click completed";
+
+                    console.log(
+                        "[CLICK] Chained action successful"
+                    );
+
+                }
+
+            }
+        );
+
+
+        // ==========================================
+        // 10. CORRUPTED STATE VALIDATION
+        // ==========================================
+
+        async function validateState(balance) {
+
+            try {
+
+                const response = await fetch(
+                    "/validate-state",
+                    {
+
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            balance: balance
+                        })
+
+                    }
+                );
+
+                return await response.json();
+
+            } catch (error) {
+
+                console.error(
+                    "[VALIDATION] Request failed",
+                    error
+                );
+
+                return {
+
+                    accepted: false,
+
+                    error: {
+                        code: "REQUEST_FAILED",
+                        message: error.message
+                    }
+
+                };
+
+            }
+
+        }
+
+
+        // ==========================================
+        // 11. INITIALIZATION
+        // ==========================================
+
+        connectWebSocket();
+
+        draw();
+
+
+        // ==========================================
+        // 12. CLEANUP
+        // ==========================================
+
+        window.addEventListener(
+            "beforeunload",
+            function () {
+
+                if (animationFrame !== null) {
+                    cancelAnimationFrame(animationFrame);
+                }
+
+                if (socket) {
+                    socket.close();
+                }
+
+            }
+        );
+
+    </script>
+
+</body>
+
+</html>
